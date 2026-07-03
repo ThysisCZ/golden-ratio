@@ -127,6 +127,54 @@ void draw_spiral()
     }
 }
 
+void draw_square_sizes(Square *squares)
+{
+    int font_size = 10;
+
+    for (int i = 6; i < MAX_SQUARE_COUNT; i++)
+    {
+        float offset;
+
+        if (i <= 6)
+        {
+            offset = sqrt(MAX_SQUARE_COUNT - i);
+        }
+        else if (i > 6 && i <= 8)
+        {
+            offset = sqrt(MAX_SQUARE_COUNT - i) + i / 4;
+        }
+        else if (i > 8 && i <= 11)
+        {
+            offset = sqrt(MAX_SQUARE_COUNT - i) + i * 0.7;
+        }
+        else
+        {
+            offset = sqrt(MAX_SQUARE_COUNT - i) + 35;
+        }
+
+        float center_x = squares[i].pos_x + squares[i].size / 2 - offset;
+        float center_y = squares[i].pos_y + squares[i].size / 2 - offset;
+
+        if (i > 11 && i <= 14)
+        {
+            center_y += i;
+        }
+
+        const char *size_text = TextFormat("%d", squares[i].size);
+
+        if (i == 9)
+        {
+            font_size += 10;
+        }
+        else if (i == 12)
+        {
+            font_size += 30;
+        }
+
+        DrawText(size_text, center_x, center_y, font_size, WHITE);
+    }
+}
+
 int main()
 {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Golden Ratio");
@@ -142,6 +190,7 @@ int main()
         BeginDrawing();
 
         draw_squares(&squares[0]);
+        draw_square_sizes(&squares[0]);
         draw_spiral();
 
         EndDrawing();
