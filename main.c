@@ -2,9 +2,15 @@
 #include <raylib.h>
 #include <math.h>
 
-#define MAX_SQUARE_COUNT 16
 #define SCREEN_WIDTH fibonacci(MAX_SQUARE_COUNT)
 #define SCREEN_HEIGHT fibonacci(MAX_SQUARE_COUNT - 1)
+#define MAX_SQUARE_COUNT 16
+#define MAX_POINT_COUNT get_point_count(MAX_SQUARE_COUNT - 1)
+
+int current_point_count = 0;
+float points_per_frame = 1;
+int square_index = 1;
+float phi;
 
 typedef struct
 {
@@ -12,6 +18,13 @@ typedef struct
     float pos_y;
     int size;
 } Square;
+
+typedef struct
+{
+    float pos_x;
+    float pos_y;
+    int rad;
+} SpiralPoint;
 
 int fibonacci(int n)
 {
@@ -80,50 +93,61 @@ void draw_squares(Square *squares)
     }
 }
 
-void draw_spiral()
+void calculate_spiral(Square *squares, SpiralPoint *points)
 {
     float angle = 0;
     int k = 0;
+    int square_start_index = 0;
+    int current_index = 0;
 
-    float pos_x = 0;
-    float pos_y = fibonacci(MAX_SQUARE_COUNT - 1);
+    float pos_x = squares[0].pos_x;
+    float pos_y = squares[0].pos_y;
+    int point_rad = 1;
 
     Vector2 center;
     float step;
-    float rad;
+    float square_rad;
 
-    for (int j = MAX_SQUARE_COUNT - 1; j >= 0; j--)
+    for (int j = 0; j < MAX_SQUARE_COUNT; j++)
     {
         // Calculate center positions of quarter circles
-        if (j == 15 - k)
+        if (j == k)
         {
             center = (Vector2){pos_x + (float)fibonacci(j), pos_y};
         }
-        else if (j == 14 - k)
+        else if (j == 1 + k)
         {
-            center = (Vector2){pos_x, pos_y + (float)fibonacci(j)};
+            center = (Vector2){pos_x, pos_y - (float)fibonacci(j)};
         }
-        else if (j == 13 - k)
+        else if (j == 2 + k)
         {
             center = (Vector2){pos_x - (float)fibonacci(j), pos_y};
         }
-        else if (j == 12 - k)
+        else if (j == 3 + k)
         {
-            center = (Vector2){pos_x, pos_y - (float)fibonacci(j)};
+            center = (Vector2){pos_x, pos_y + (float)fibonacci(j)};
             k += 4;
         }
 
         step = (PI / 2) / fibonacci(j);
-        rad = fibonacci(j);
+        square_rad = fibonacci(j);
 
+        // Create spiral points based on the first quarter circle
         for (int i = 0; i < fibonacci(j); i++)
         {
-            pos_x = center.x - rad * cos(angle);
-            pos_y = center.y - rad * sin(angle);
+            pos_x = center.x - square_rad * cos(angle); // point moves towards center from left horizontally => subtract cosine
+            pos_y = center.y + square_rad * sin(angle); // point moves away from center towards bottom vertically => add sine
 
-            DrawCircle(pos_x, pos_y, 1, BLUE);
+            current_index = square_start_index + i;
+
+            points[current_index].pos_x = pos_x;
+            points[current_index].pos_y = pos_y;
+            points[current_index].rad = point_rad;
+
             angle += step;
         }
+
+        square_start_index += fibonacci(j);
     }
 }
 
@@ -175,6 +199,67 @@ void draw_square_sizes(Square *squares)
     }
 }
 
+int get_point_count(int square_count)
+{
+    int sum = 0;
+
+    for (int i = 0; i <= square_count; i++)
+    {
+        sum += fibonacci(i);
+    }
+
+    return sum;
+}
+
+void draw_spiral(SpiralPoint *points)
+{
+    for (int i = 0; i < current_point_count; i++)
+    {
+        float pos_x = points[i].pos_x;
+        float pos_y = points[i].pos_y;
+        int rad = points[i].rad;
+
+        DrawCircle(pos_x, pos_y, rad, BLUE);
+    }
+}
+
+void animate_spiral()
+{
+    if (current_point_count < MAX_POINT_COUNT - points_per_frame)
+    {
+        int k = 0;
+
+        if (current_point_count == get_point_count(3 + k))
+        {
+            k += 2;
+            points_per_frame *= exp(pow(k, 1.4)) / k;
+        }
+
+        current_point_count += points_per_frame;
+    }
+}
+
+void calculate_phi(Square *squares)
+{
+    if (current_point_count >= get_point_count(square_index) - points_per_frame)
+    {
+        float n1 = squares[square_index - 1].size;
+        float n2 = squares[square_index].size;
+
+        phi = n2 / n1;
+
+        square_index += 1;
+    }
+
+    const char *phi_text = TextFormat("phi = ± %f", phi);
+
+    int pos_x = 10;
+    int pos_y = 5;
+    int font_size = 30;
+
+    DrawText(phi_text, pos_x, pos_y, font_size, WHITE);
+}
+
 int main()
 {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Golden Ratio");
@@ -182,18 +267,25 @@ int main()
     SetTargetFPS(15);
 
     Square squares[MAX_SQUARE_COUNT];
+    SpiralPoint points[MAX_POINT_COUNT];
 
     calculate_squares(&squares[0]);
+    calculate_spiral(&squares[0], &points[0]);
 
     while (!WindowShouldClose())
     {
         BeginDrawing();
+        ClearBackground(BLACK);
 
         draw_squares(&squares[0]);
         draw_square_sizes(&squares[0]);
-        draw_spiral();
+        draw_spiral(&points[0]);
+
+        calculate_phi(&squares[0]);
 
         EndDrawing();
+
+        animate_spiral();
     }
 
     CloseWindow();
