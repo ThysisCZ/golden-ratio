@@ -7,11 +7,6 @@
 #define MAX_SQUARE_COUNT 16
 #define MAX_POINT_COUNT get_point_count(MAX_SQUARE_COUNT - 1)
 
-int current_point_count = 0;
-float points_per_frame = 1;
-int square_index = 1;
-float phi;
-
 typedef struct
 {
     float pos_x;
@@ -24,7 +19,15 @@ typedef struct
     float pos_x;
     float pos_y;
     int rad;
-} SpiralPoint;
+} Point;
+
+typedef struct
+{
+    float current_phi;
+    float points_per_frame;
+    int current_point_count;
+    int square_index;
+} Spiral;
 
 int fibonacci(int n)
 {
@@ -93,7 +96,7 @@ void draw_squares(Square *squares)
     }
 }
 
-void calculate_spiral(Square *squares, SpiralPoint *points)
+void calculate_spiral(Square *squares, Point *points)
 {
     float angle = 0;
     int k = 0;
@@ -154,43 +157,44 @@ void calculate_spiral(Square *squares, SpiralPoint *points)
 void draw_square_sizes(Square *squares)
 {
     int font_size = 10;
+    const int k = 3;
 
-    for (int i = 6; i < MAX_SQUARE_COUNT; i++)
+    for (int i = 2 * k; i < MAX_SQUARE_COUNT; i++)
     {
-        float offset;
+        float offset = sqrt(MAX_SQUARE_COUNT - i);
 
-        if (i <= 6)
+        if (i <= 2 * k)
         {
             offset = sqrt(MAX_SQUARE_COUNT - i);
         }
-        else if (i > 6 && i <= 8)
+        else if (i > 2 * k && i <= 3 * k - 1)
         {
-            offset = sqrt(MAX_SQUARE_COUNT - i) + i / 4;
+            offset += i / 4;
         }
-        else if (i > 8 && i <= 11)
+        else if (i > 3 * k - 1 && i <= 4 * k - 1)
         {
-            offset = sqrt(MAX_SQUARE_COUNT - i) + i * 0.7;
+            offset += i * 0.7;
         }
         else
         {
-            offset = sqrt(MAX_SQUARE_COUNT - i) + 35;
+            offset += 35;
         }
 
         float center_x = squares[i].pos_x + squares[i].size / 2 - offset;
         float center_y = squares[i].pos_y + squares[i].size / 2 - offset;
 
-        if (i > 11 && i <= 14)
+        if (i > 4 * k - 1 && i <= 5 * k - 1)
         {
             center_y += i;
         }
 
         const char *size_text = TextFormat("%d", squares[i].size);
 
-        if (i == 9)
+        if (i == 3 * k)
         {
             font_size += 10;
         }
-        else if (i == 12)
+        else if (i == 4 * k)
         {
             font_size += 30;
         }
@@ -211,9 +215,9 @@ int get_point_count(int square_count)
     return sum;
 }
 
-void draw_spiral(SpiralPoint *points)
+void draw_spiral(Point *points, Spiral *spiral)
 {
-    for (int i = 0; i < current_point_count; i++)
+    for (int i = 0; i < spiral->current_point_count; i++)
     {
         float pos_x = points[i].pos_x;
         float pos_y = points[i].pos_y;
@@ -223,35 +227,38 @@ void draw_spiral(SpiralPoint *points)
     }
 }
 
-void animate_spiral()
+void animate_spiral(Spiral *spiral)
 {
-    if (current_point_count < MAX_POINT_COUNT - points_per_frame)
+    if (spiral->current_point_count < MAX_POINT_COUNT - spiral->points_per_frame)
     {
-        int k = 0;
+        const int n1 = fibonacci(MAX_SQUARE_COUNT - 1);
+        const int n2 = fibonacci(MAX_SQUARE_COUNT);
+        const float phi = (float)n2 / (float)n1;
 
-        if (current_point_count == get_point_count(3 + k))
+        // Multiply points per frame with golden ratio on each square for smooth speed
+        if (spiral->current_point_count == get_point_count(spiral->square_index - 1))
         {
-            k += 2;
-            points_per_frame *= exp(pow(k, 1.4)) / k;
+            spiral->points_per_frame *= phi;
         }
 
-        current_point_count += points_per_frame;
+        spiral->current_point_count += spiral->points_per_frame;
     }
 }
 
-void calculate_phi(Square *squares)
+void calculate_phi(Square *squares, Spiral *spiral)
 {
-    if (current_point_count >= get_point_count(square_index) - points_per_frame)
+    // Divide current square size with its predecessor's size
+    if (spiral->current_point_count >= get_point_count(spiral->square_index) - spiral->points_per_frame)
     {
-        float n1 = squares[square_index - 1].size;
-        float n2 = squares[square_index].size;
+        float n1 = squares[spiral->square_index - 1].size;
+        float n2 = squares[spiral->square_index].size;
 
-        phi = n2 / n1;
+        spiral->current_phi = n2 / n1;
 
-        square_index += 1;
+        spiral->square_index++;
     }
 
-    const char *phi_text = TextFormat("phi = ± %f", phi);
+    const char *phi_text = TextFormat("phi = ± %f", spiral->current_phi);
 
     int pos_x = 10;
     int pos_y = 5;
@@ -267,7 +274,12 @@ int main()
     SetTargetFPS(15);
 
     Square squares[MAX_SQUARE_COUNT];
-    SpiralPoint points[MAX_POINT_COUNT];
+    Point points[MAX_POINT_COUNT];
+    Spiral spiral;
+
+    spiral.points_per_frame = 1;
+    spiral.current_point_count = 0;
+    spiral.square_index = 1;
 
     calculate_squares(&squares[0]);
     calculate_spiral(&squares[0], &points[0]);
@@ -279,13 +291,13 @@ int main()
 
         draw_squares(&squares[0]);
         draw_square_sizes(&squares[0]);
-        draw_spiral(&points[0]);
+        draw_spiral(&points[0], &spiral);
 
-        calculate_phi(&squares[0]);
+        calculate_phi(&squares[0], &spiral);
 
         EndDrawing();
 
-        animate_spiral();
+        animate_spiral(&spiral);
     }
 
     CloseWindow();
